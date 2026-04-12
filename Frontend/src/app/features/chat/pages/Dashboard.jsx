@@ -36,7 +36,7 @@ const Dashboard = () => {
     <main className='min-h-screen w-full bg-[#07090f] p-3 text-white md:p-5'>
       <section className='mx-auto flex h-[calc(100vh-1.5rem)] w-full gap-4 rounded-3xl border   p-1 md:h-[calc(100vh-2.5rem)] md:gap-6 md:p-1 border-none'>
         <aside className='hidden h-full w-72 shrink-0 rounded-3xl border  bg-[#080b12] p-4 md:flex md:flex-col'>
-          <h1 className='mb-5 text-3xl font-semibold tracking-tight'>Perplexity</h1>
+          <h1 className='mb-5 text-3xl font-semibold tracking-tight'>INQORA AI</h1>
 
           <div className='space-y-2'>
             {Object.values(chats).map((chat,index) => (

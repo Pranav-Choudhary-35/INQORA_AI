@@ -20,6 +20,10 @@ const messageSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
+// Add indexes for frequently queried fields
+messageSchema.index({ chat: 1 });
+messageSchema.index({ chat: 1, createdAt: -1 });
+
 const messageModel = mongoose.model('Message', messageSchema);
 
 export default messageModel;

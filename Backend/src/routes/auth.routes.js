@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { register, verifyEmail, login, getMe } from "../controllers/auth.controller.js";
+import { register, verifyEmail, login, getMe, checkVerified } from "../controllers/auth.controller.js";
 import { registerValidator, loginValidator } from "../validators/auth.validator.js";
 import { authUser } from "../middleware/auth.middleware.js";
 
@@ -38,5 +38,13 @@ authRouter.get('/get-me', authUser, getMe)
  * @query { token }
  */
 authRouter.get('/verify-email', verifyEmail)
+
+/**
+ * @route GET /api/auth/check-verified
+ * @desc Check if user email is verified
+ * @access Public
+ * @query { email }
+ */
+authRouter.get('/check-verified', checkVerified)
 
 export default authRouter;

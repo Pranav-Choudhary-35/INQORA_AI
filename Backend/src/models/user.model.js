@@ -38,6 +38,10 @@ userSchema.methods.comparePassword = function (candidatePassword) {
     return bcrypt.compare(candidatePassword, this.password);
 };
 
+// Add indexes for frequently queried fields
+userSchema.index({ email: 1 });
+userSchema.index({ username: 1 });
+
 
 const userModel = mongoose.model('User', userSchema);
 

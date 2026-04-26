@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { useSelector } from 'react-redux'
 import { useChat } from '../hooks/useChat'
@@ -16,7 +16,17 @@ const Dashboard = () => {
     chat.handleGetChats()
   }, [])
 
-  const handleSubmitMessage = (event) => {
+  // Memoize the current chat messages for performance
+  const currentChatMessages = useMemo(() => {
+    return chats[currentChatId]?.messages || []
+  }, [chats, currentChatId])
+
+  // Memoize chat list for performance
+  const chatList = useMemo(() => {
+    return Object.values(chats)
+  }, [chats])
+
+  const handleSubmitMessage = useCallback((event) => {
     event.preventDefault()
 
     const trimmedMessage = chatInput.trim()
@@ -26,11 +36,11 @@ const Dashboard = () => {
 
     chat.handleSendMessage({ message: trimmedMessage, chatId: currentChatId })
     setChatInput('')
-  }
+  }, [chatInput, currentChatId, chat])
 
-  const openChat = (chatId) => {
-    chat.handleOpenChat(chatId,chats)
-  }
+  const openChat = useCallback((chatId) => {
+    chat.handleOpenChat(chatId, chats)
+  }, [chat, chats])
 
   return (
     <main className='min-h-screen w-full bg-[#07090f] p-3 text-white md:p-5'>
@@ -39,9 +49,9 @@ const Dashboard = () => {
           <h1 className='mb-5 text-3xl font-semibold tracking-tight'>INQORA AI</h1>
 
           <div className='space-y-2'>
-            {Object.values(chats).map((chat,index) => (
+            {chatList.map((chat, index) => (
               <button
-                onClick={()=>{openChat(chat.id)}}
+                onClick={() => { openChat(chat.id) }}
                 key={index}
                 type='button'
                 className='w-full cursor-pointer rounded-xl border border-white/60 bg-transparent px-3 py-2 text-left text-base font-medium text-white/90 transition hover:border-white hover:text-white'
@@ -55,7 +65,7 @@ const Dashboard = () => {
         <section className='relative max-w-3/5 mx-auto flex h-full min-w-0 flex-1 flex-col gap-4'>
 
           <div className='messages flex-1 space-y-3 overflow-y-auto pr-1 pb-30'>
-            {chats[ currentChatId ]?.messages.map((message) => (
+            {currentChatMessages.map((message) => (
               <div
                 key={message.id}
                 className={`max-w-[82%] w-fit rounded-2xl px-4 py-3 text-sm md:text-base ${message.role === 'user'
@@ -105,7 +115,7 @@ const Dashboard = () => {
       </section>
     </main>
   )
-  
+             
 }
 
 export default Dashboard

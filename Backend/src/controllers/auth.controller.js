@@ -186,3 +186,44 @@ export async function verifyEmail(req, res) {
         })
     }
 }
+
+/**
+ * @desc Check if user email is verified
+ * @route GET /api/auth/check-verified
+ * @access Public
+ * @query { email }
+ */
+export async function checkVerified(req, res) {
+    const { email } = req.query;
+
+    if (!email) {
+        return res.status(400).json({
+            message: "Email is required",
+            success: false,
+        });
+    }
+
+    try {
+        const user = await userModel.findOne({ email: email.toLowerCase() }).select("verified");
+
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found",
+                success: false,
+                verified: false,
+            });
+        }
+
+        res.status(200).json({
+            message: "Verification status retrieved",
+            success: true,
+            verified: user.verified,
+        });
+    } catch (err) {
+        res.status(500).json({
+            message: "Error checking verification status",
+            success: false,
+            err: err.message,
+        });
+    }
+}

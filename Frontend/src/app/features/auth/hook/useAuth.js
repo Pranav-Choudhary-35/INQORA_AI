@@ -1,5 +1,5 @@
 import { useDispatch } from "react-redux";
-import { register, login, getCurrentUser } from "../services/api.auth";
+import { register, login, logout, getCurrentUser } from "../services/api.auth";
 import { setUser, setLoading, setError } from "../auth.slice";
 
 export function useAuth() {
@@ -11,7 +11,7 @@ export function useAuth() {
 
       const res = await register({ email, username, password });
 
-      dispatch(setUser(res));
+      dispatch(setUser(res.user));
 
       return res;
     } catch (error) {
@@ -29,11 +29,11 @@ export function useAuth() {
   try {
     dispatch(setLoading(true));
 
-    const user = await login({ email, password });
+    const res = await login({ email, password });
 
-    dispatch(setUser(user));
+    dispatch(setUser(res.user));
 
-    return user;
+    return res;
   } catch (error) {
     const message =
       error.response?.data?.message ||
@@ -50,8 +50,8 @@ export function useAuth() {
   async function fetchCurrentUser() {
     try {
       dispatch(setLoading(true));
-      const user = await getCurrentUser();
-      dispatch(setUser(user));
+      const res = await getCurrentUser();
+      dispatch(setUser(res.user));
     } catch (error) {
       dispatch(
         setError(error.response?.data?.message || "Failed to fetch user"),
@@ -61,5 +61,15 @@ export function useAuth() {
     }
   }
 
-  return { handleRegister, handleLogin, fetchCurrentUser };
+  async function handleLogout(navigate) {
+    try {
+      await logout();
+      dispatch(setUser(null));
+      navigate?.("/login");
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  return { handleRegister, handleLogin, handleLogout, fetchCurrentUser };
 }

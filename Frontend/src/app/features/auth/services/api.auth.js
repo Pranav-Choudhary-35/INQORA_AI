@@ -1,9 +1,6 @@
 import axios from "axios";
 
-const API_BASE_URL = "http://localhost:3000";
-
 const api = axios.create({
-  baseURL: API_BASE_URL,
   withCredentials: true,
 });
 
@@ -41,7 +38,8 @@ export async function login({ email, password }) {
 
 export async function logout() {
   try {
-    await api.post("/api/auth/logout");
+    const response = await api.post("/api/auth/logout", {});
+    return response.data;
   } catch (error) {
     console.error("Logout error:", error);
     throw error.response ? error.response.data : new Error("Network error");

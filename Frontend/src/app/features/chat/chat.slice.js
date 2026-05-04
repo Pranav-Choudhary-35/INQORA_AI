@@ -27,6 +27,14 @@ const chatSlice = createSlice({
             const { chatId, messages } = action.payload
             state.chats[ chatId ].messages.push(...messages)
         },
+        appendToLastAiMessage: (state, action) => {
+            const { chatId, token } = action.payload
+            const messages = state.chats[ chatId ]?.messages
+            if (!messages?.length) return
+            const lastIndex = messages.length - 1
+            if (messages[ lastIndex ].role !== "ai") return
+            messages[ lastIndex ].content = `${messages[ lastIndex ].content || ""}${token}`
+        },
         setChats: (state, action) => {
             state.chats = action.payload
         },
@@ -42,8 +50,7 @@ const chatSlice = createSlice({
     }
 })
 
-export const { setChats, setCurrentChatId, setLoading, setError, createNewChat, addNewMessage, addMessages } = chatSlice.actions
+export const { setChats, setCurrentChatId, setLoading, setError, createNewChat, addNewMessage, addMessages, appendToLastAiMessage } = chatSlice.actions
 export default chatSlice.reducer
-
 
 

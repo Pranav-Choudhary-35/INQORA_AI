@@ -2,10 +2,9 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { useSelector, useDispatch } from 'react-redux'
 import { useChat } from '../hooks/useChat'
+import { useAuth } from '../../auth/hook/useAuth'
 import { useNavigate } from 'react-router'
 import remarkGfm from 'remark-gfm'
-import { logout } from '../../auth/services/api.auth'
-import { setUser } from '../../auth/auth.slice'
 import { setCurrentChatId } from '../chat.slice'
 import {
   Menu,
@@ -23,6 +22,7 @@ import '../../../../app/index.css'
 
 const Dashboard = () => {
   const chat = useChat()
+  const auth = useAuth()
   const dispatch = useDispatch()
   const navigate = useNavigate()
   const [chatInput, setChatInput] = useState('')
@@ -33,14 +33,26 @@ const Dashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [darkMode, setDarkMode] = useState(true)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [isStreaming, setIsStreaming] = useState(false)
 
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
   const profileRef = useRef(null)
+  const eventSourceRef = useRef(null)
+  const abortRef = useRef(false)
 
   useEffect(() => {
     chat.initializeSocketConnection()
     chat.handleGetChats()
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      abortRef.current = true
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close()
+      }
+    }
   }, [])
 
   // Auto-scroll to bottom when messages change
@@ -72,12 +84,24 @@ const Dashboard = () => {
   const handleSubmitMessage = useCallback(
     (event) => {
       event.preventDefault()
+      if (isStreaming) return
       const trimmedMessage = chatInput.trim()
       if (!trimmedMessage) return
-      chat.handleSendMessage({ message: trimmedMessage, chatId: currentChatId })
+      setIsStreaming(true)
+      abortRef.current = false
+      chat.handleSendMessageStream({
+        message: trimmedMessage,
+        chatId: currentChatId,
+        controllerRef: eventSourceRef,
+        onDone: () => {
+          if (!abortRef.current) {
+            setIsStreaming(false)
+          }
+        },
+      })
       setChatInput('')
     },
-    [chatInput, currentChatId, chat]
+    [chatInput, currentChatId, chat, isStreaming]
   )
 
   const openChat = useCallback(
@@ -94,14 +118,8 @@ const Dashboard = () => {
   }, [dispatch])
 
   const handleLogout = useCallback(async () => {
-    try {
-      await logout()
-      dispatch(setUser(null))
-      navigate('/login')
-    } catch (err) {
-      console.error('Logout failed:', err)
-    }
-  }, [dispatch, navigate])
+    await auth.handleLogout(navigate)
+  }, [auth, navigate])
 
   // --- Theme tokens ---
   const theme = darkMode
@@ -445,7 +463,7 @@ const Dashboard = () => {
                   fontWeight: 500,
                 }}
               >
-                {user?.username || 'User'}
+                {user?.fullname || user?.username || 'User'}
               </span>
               <ChevronUp
                 size={14}
@@ -574,6 +592,7 @@ const Dashboard = () => {
                     type="text"
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
+                    disabled={isStreaming}
                     placeholder="Ask anything..."
                     style={{
                       width: '100%',
@@ -598,7 +617,7 @@ const Dashboard = () => {
                   />
                   <button
                     type="submit"
-                    disabled={!chatInput.trim()}
+                    disabled={!chatInput.trim() || isStreaming}
                     style={{
                       position: 'absolute',
                       right: 8,
@@ -606,16 +625,16 @@ const Dashboard = () => {
                       transform: 'translateY(-50%)',
                       background: 'none',
                       border: 'none',
-                      color: chatInput.trim()
+                      color: chatInput.trim() && !isStreaming
                         ? theme.text
                         : theme.textMuted,
-                      cursor: chatInput.trim() ? 'pointer' : 'not-allowed',
+                      cursor: chatInput.trim() && !isStreaming ? 'pointer' : 'not-allowed',
                       padding: 6,
                       display: 'flex',
                       alignItems: 'center',
                       borderRadius: 6,
                       transition: 'color 200ms, opacity 200ms',
-                      opacity: chatInput.trim() ? 1 : 0.4,
+                      opacity: chatInput.trim() && !isStreaming ? 1 : 0.4,
                     }}
                   >
                     <Send size={18} />
@@ -780,6 +799,7 @@ const Dashboard = () => {
                       type="text"
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}
+                      disabled={isStreaming}
                       placeholder="Type a message..."
                       style={{
                         width: '100%',
@@ -801,7 +821,7 @@ const Dashboard = () => {
                     />
                     <button
                       type="submit"
-                      disabled={!chatInput.trim()}
+                      disabled={!chatInput.trim() || isStreaming}
                       style={{
                         position: 'absolute',
                         right: 6,
@@ -809,16 +829,16 @@ const Dashboard = () => {
                         transform: 'translateY(-50%)',
                         background: 'none',
                         border: 'none',
-                        color: chatInput.trim()
+                        color: chatInput.trim() && !isStreaming
                           ? theme.text
                           : theme.textMuted,
-                        cursor: chatInput.trim() ? 'pointer' : 'not-allowed',
+                        cursor: chatInput.trim() && !isStreaming ? 'pointer' : 'not-allowed',
                         padding: 6,
                         display: 'flex',
                         alignItems: 'center',
                         borderRadius: 6,
                         transition: 'color 200ms, opacity 200ms',
-                        opacity: chatInput.trim() ? 1 : 0.4,
+                        opacity: chatInput.trim() && !isStreaming ? 1 : 0.4,
                       }}
                     >
                       <Send size={16} />

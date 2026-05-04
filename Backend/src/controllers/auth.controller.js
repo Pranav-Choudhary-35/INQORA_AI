@@ -114,6 +114,24 @@ export async function login(req, res) {
 
 }
 
+/**
+ * @desc Logout user and clear authentication cookie
+ * @route POST /api/auth/logout
+ * @access Public
+ */
+export async function logout(req, res) {
+    res.clearCookie("token", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict"
+    });
+
+    res.status(200).json({
+        success: true,
+        message: "Logged out successfully"
+    });
+}
+
 
 /**
  * @desc Get current logged in user's details
@@ -123,7 +141,7 @@ export async function login(req, res) {
 export async function getMe(req, res) {
     const userId = req.user.id;
 
-    const user = await userModel.findById(userId).select("-password");
+    const user = await userModel.findById(userId).select("_id username email");
 
     if (!user) {
         return res.status(404).json({
@@ -136,7 +154,11 @@ export async function getMe(req, res) {
     res.status(200).json({
         message: "User details fetched successfully",
         success: true,
-        user
+        user: {
+            _id: user._id,
+            username: user.username,
+            email: user.email
+        }
     })
 }
 

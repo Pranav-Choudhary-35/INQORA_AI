@@ -1,4 +1,4 @@
-import { generateResponse, generateChatTitle } from "../services/ai.service.js";
+import { generateResponse, generateChatTitle, streamResponse, extractStreamToken } from "../services/ai.service.js";
 import chatModel from "../models/chat.model.js"
 import messageModel from "../models/message.model.js";
 
@@ -44,6 +44,74 @@ export async function sendMessage(req, res) {
         aiMessage
     })
 
+}
+
+export async function streamMessage(req, res) {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    try {
+        const { message, chat: chatId } = req.body;
+
+        if (!message) {
+            res.write(`data: ${JSON.stringify({ error: true })}\n\n`);
+            return res.end();
+        }
+
+        let title = null, chat = null;
+
+        if (!chatId) {
+            title = await generateChatTitle(message);
+            chat = await chatModel.create({
+                user: req.user.id,
+                title
+            })
+        }
+
+        const activeChatId = chatId || chat._id;
+
+        await messageModel.create({
+            chat: activeChatId,
+            content: message,
+            role: "user"
+        })
+
+        res.write(`data: ${JSON.stringify({
+            chat: chat ? { _id: chat._id, title: chat.title } : null,
+            chatId: activeChatId
+        })}\n\n`);
+
+        const messages = await messageModel.find({ chat: activeChatId }).lean();
+        const stream = await streamResponse(messages);
+        let content = "";
+
+        for await (const chunk of stream) {
+            const token = extractStreamToken(chunk);
+            if (token) {
+                content += token;
+                res.write(`data: ${JSON.stringify({ token })}\n\n`);
+            }
+        }
+
+        if (!content) {
+            res.write(`data: ${JSON.stringify({ error: true })}\n\n`);
+            return res.end();
+        }
+
+        await messageModel.create({
+            chat: activeChatId,
+            content,
+            role: "ai"
+        })
+
+        res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+        res.end();
+    } catch (err) {
+        console.error("Error streaming response:", err);
+        res.write(`data: ${JSON.stringify({ error: true })}\n\n`);
+        res.end();
+    }
 }
 
 export async function getChats(req, res) {

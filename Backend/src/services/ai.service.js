@@ -30,32 +30,71 @@ const agent = createAgent({
     tools: [ searchInternetTool ],
 })
 
+function getContentText(content) {
+    if (!content) return "";
+    if (typeof content === "string") return content;
+    if (!Array.isArray(content)) return "";
+
+    return content.map(block => {
+        if (typeof block === "string") return block;
+        return block?.text || block?.content || "";
+    }).join("");
+}
+
+export function extractStreamToken(chunk) {
+    const message = Array.isArray(chunk) ? chunk[ 0 ] : chunk;
+    return getContentText(
+        message?.content ||
+        message?.content_blocks ||
+        message?.contentBlocks ||
+        message?.kwargs?.content ||
+        message?.text
+    );
+}
+
+function buildAgentMessages(messages) {
+    return [
+        new SystemMessage(`
+            You are a helpful and precise assistant for answering questions.
+            If you don't know the answer, say you don't know. 
+            If the question requires up-to-date information, use the "searchInternet" tool to get the latest information from the internet and then answer based on the search results.
+        `),
+        ...(messages.map(msg => {
+            if (msg.role == "user") {
+                return new HumanMessage(msg.content)
+            } else if (msg.role == "ai") {
+                return new AIMessage(msg.content)
+            }
+        }).filter(Boolean)) ]
+}
+
 export async function generateResponse(messages) {
     try {
         console.log(messages)
 
-        const response = await agent.invoke({
-            messages: [
-                new SystemMessage(`
-                    You are a helpful and precise assistant for answering questions.
-                    If you don't know the answer, say you don't know. 
-                    If the question requires up-to-date information, use the "searchInternet" tool to get the latest information from the internet and then answer based on the search results.
-                `),
-                ...(messages.map(msg => {
-                    if (msg.role == "user") {
-                        return new HumanMessage(msg.content)
-                    } else if (msg.role == "ai") {
-                        return new AIMessage(msg.content)
-                    }
-                })) ]
-        });
+        const stream = await streamResponse(messages);
+        let content = "";
 
-        return response.messages[ response.messages.length - 1 ].text;
+        for await (const chunk of stream) {
+            const token = extractStreamToken(chunk);
+            if (token) {
+                content += token;
+            }
+        }
+
+        return content;
     } catch (err) {
         console.error("Error generating response:", err);
         throw new Error(`Failed to generate AI response: ${err.message}`);
     }
 
+}
+
+export async function streamResponse(messages) {
+    return agent.stream(
+        { messages: buildAgentMessages(messages) },
+        { streamMode: "messages" }
+    );
 }
 
 export async function generateChatTitle(message) {

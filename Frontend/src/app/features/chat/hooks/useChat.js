@@ -1,6 +1,6 @@
 import { initializeSocketConnection } from "../service/chat.socket";
 import { sendMessage, getChats, getMessages, deleteChat } from "../service/chat.api";
-import { setChats, setCurrentChatId, setError, setLoading, createNewChat, addNewMessage, addMessages } from "../chat.slice";
+import { setChats, setCurrentChatId, setError, setLoading, createNewChat, addNewMessage, addMessages, appendToLastAiMessage } from "../chat.slice";
 import { useDispatch } from "react-redux";
 
 
@@ -29,6 +29,90 @@ export const useChat = () => {
             role: aiMessage.role,
         }))
         dispatch(setCurrentChatId(chat._id))
+    }
+
+    async function handleSendMessageStream({ message, chatId, controllerRef, onDone }) {
+        const controller = new AbortController()
+        controllerRef.current = {
+            close: () => controller.abort()
+        }
+
+        try {
+            const response = await fetch("/api/chat/stream", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                credentials: "include",
+                body: JSON.stringify({ message, chat: chatId }),
+                signal: controller.signal
+            })
+
+            if (!response.ok || !response.body) {
+                throw new Error("Failed to start chat stream")
+            }
+
+            const reader = response.body.getReader()
+            const decoder = new TextDecoder()
+            let buffer = ""
+            let activeChatId = chatId
+
+            while (true) {
+                const { value, done } = await reader.read()
+                if (done) break
+
+                buffer += decoder.decode(value, { stream: true })
+                const events = buffer.split("\n\n")
+                buffer = events.pop() || ""
+
+                for (const event of events) {
+                    if (!event.startsWith("data: ")) continue
+                    const data = JSON.parse(event.slice(6))
+
+                    if (data.chat) {
+                        activeChatId = data.chat._id
+                        dispatch(createNewChat({
+                            chatId: data.chat._id,
+                            title: data.chat.title,
+                        }))
+                        dispatch(setCurrentChatId(data.chat._id))
+                    } else if (data.chatId) {
+                        activeChatId = data.chatId
+                    }
+
+                    if (data.chatId || data.chat) {
+                        dispatch(addNewMessage({
+                            chatId: activeChatId,
+                            content: message,
+                            role: "user",
+                        }))
+                        dispatch(addNewMessage({
+                            chatId: activeChatId,
+                            content: "",
+                            role: "ai",
+                        }))
+                    }
+
+                    if (data.done || data.error) {
+                        return
+                    }
+
+                    if (data.token && activeChatId) {
+                        dispatch(appendToLastAiMessage({
+                            chatId: activeChatId,
+                            token: data.token,
+                        }))
+                    }
+                }
+            }
+        } catch (err) {
+            if (err.name !== "AbortError") {
+                dispatch(setError(err.message))
+            }
+        } finally {
+            controllerRef.current = null
+            onDone?.()
+        }
     }
 
     async function handleGetChats() {
@@ -71,6 +155,7 @@ export const useChat = () => {
     return {
         initializeSocketConnection,
         handleSendMessage,
+        handleSendMessageStream,
         handleGetChats,
         handleOpenChat
     }

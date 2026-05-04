@@ -3,6 +3,7 @@ import { Link, useNavigate, Navigate } from 'react-router'
 import { useAuth } from '../hook/useAuth'
 import { useSelector } from 'react-redux'
 import { XCircle } from "lucide-react";
+import ParallaxStars from '../components/ParallaxStars'
 
 const Login = () => {
   const [email, setEmail] = useState('')
@@ -42,8 +43,11 @@ const Login = () => {
 
   return (
     <>
-      <section className="min-h-screen bg-zinc-950 px-4 py-10 text-zinc-100">
-        <div className="mx-auto flex min-h-[85vh] w-full max-w-5xl items-center justify-center">
+      <section className="relative min-h-screen overflow-hidden bg-[#090A0F] px-4 py-10 text-zinc-100">
+        {/* Parallax stars background */}
+        <ParallaxStars speed={1} />
+
+        <div className="relative z-10 mx-auto flex min-h-[85vh] w-full max-w-5xl items-center justify-center">
           <div className="w-full max-w-md rounded-2xl border border-[#31b8c6]/40 bg-zinc-900/70 p-8 shadow-2xl backdrop-blur">
             <h1 className="text-3xl font-bold text-[#31b8c6]">
               Welcome Back
@@ -82,7 +86,7 @@ const Login = () => {
             </form>
 
             <p className="mt-6 text-center text-sm">
-              Don’t have an account?{" "}
+              Don't have an account?{" "}
               <Link to="/register" className="text-[#31b8c6]">
                 Register
               </Link>

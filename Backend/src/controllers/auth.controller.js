@@ -284,4 +284,3 @@ export async function checkVerified(req, res) {
     });
   }
 }
-}

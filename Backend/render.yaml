@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: inqoraai-backend
+    runtime: node
+    plan: free
+    startCommand: npm start
+    buildCommand: npm install
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 8000
+      - key: MONGODB_URI
+        scope: project
+      - key: JWT_SECRET
+        scope: project
+      - key: CLIENT_URL
+        scope: project
+      - key: GOOGLE_USER
+        scope: project
+      - key: GOOGLE_CLIENT_ID
+        scope: project
+      - key: GOOGLE_CLIENT_SECRET
+        scope: project
+      - key: GOOGLE_REFRESH_TOKEN
+        scope: project
+      - key: GEMINI_API_KEY
+        scope: project
+      - key: MISTRAL_API_KEY
+        scope: project
+      - key: TAVILY_API_KEY
+        scope: project

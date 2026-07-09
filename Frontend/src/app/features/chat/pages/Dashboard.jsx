@@ -20,6 +20,25 @@ import {
 } from 'lucide-react'
 import '../../../../app/index.css'
 
+/**
+ * Strip markdown formatting characters from a string.
+ * Removes **, *, __, _, ~~, `, #, etc. to produce clean display text.
+ */
+const stripMarkdown = (text) => {
+  if (!text || typeof text !== 'string') return text || 'Untitled Chat'
+  return text
+    .replace(/#{1,6}\s?/g, '')      // headings
+    .replace(/\*\*(.+?)\*\*/g, '$1') // bold **text**
+    .replace(/__(.+?)__/g, '$1')     // bold __text__
+    .replace(/\*(.+?)\*/g, '$1')     // italic *text*
+    .replace(/_(.+?)_/g, '$1')       // italic _text_
+    .replace(/~~(.+?)~~/g, '$1')     // strikethrough
+    .replace(/`(.+?)`/g, '$1')       // inline code
+    .replace(/\[(.+?)\]\(.+?\)/g, '$1') // links
+    .replace(/!\[.*?\]\(.+?\)/g, '')    // images
+    .trim() || 'Untitled Chat'
+}
+
 const Dashboard = () => {
   const chat = useChat()
   const auth = useAuth()
@@ -124,31 +143,33 @@ const Dashboard = () => {
   // --- Theme tokens ---
   const theme = darkMode
     ? {
-        bg: '#0a0a0a',
-        surface: '#141414',
-        surfaceHover: '#1e1e1e',
-        border: '#222',
-        borderLight: '#2a2a2a',
-        text: '#e5e5e5',
-        textSecondary: '#888',
-        textMuted: '#555',
-        inputBg: '#141414',
-        userBubble: '#1e1e1e',
-        accent: '#e5e5e5',
+        bg: '#0B0D0C',
+        surface: '#151917',
+        surfaceHover: '#1E2320',
+        border: '#262B28',
+        borderLight: '#333A35',
+        text: '#F3F5F2',
+        textSecondary: '#8B958E',
+        textMuted: '#565F59',
+        inputBg: '#151917',
+        userBubble: '#1E2320',
+        accent: '#3ECF8E',
+        accentHover: '#56DFA0',
         shadow: '0 1px 3px rgba(0,0,0,0.3)',
       }
     : {
-        bg: '#fafafa',
-        surface: '#ffffff',
-        surfaceHover: '#f5f5f5',
-        border: '#e5e5e5',
-        borderLight: '#eee',
-        text: '#1a1a1a',
-        textSecondary: '#666',
-        textMuted: '#999',
-        inputBg: '#ffffff',
-        userBubble: '#f0f0f0',
-        accent: '#1a1a1a',
+        bg: '#FAFAF8',
+        surface: '#FFFFFF',
+        surfaceHover: '#EFF3F0',
+        border: '#E1E7E3',
+        borderLight: '#EBEFEC',
+        text: '#0F1210',
+        textSecondary: '#5C655F',
+        textMuted: '#94A099',
+        inputBg: '#FFFFFF',
+        userBubble: '#EFF3F0',
+        accent: '#1FA971',
+        accentHover: '#178A5C',
         shadow: '0 1px 3px rgba(0,0,0,0.06)',
       }
 
@@ -156,10 +177,15 @@ const Dashboard = () => {
     <>
       {/* Google Font */}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
-
         .dashboard-root * {
           font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        .dashboard-root h1,
+        .dashboard-root h2,
+        .dashboard-root h3,
+        .dashboard-root .font-heading {
+          font-family: 'Space Grotesk', sans-serif;
         }
 
         .dashboard-root ::-webkit-scrollbar {
@@ -244,16 +270,24 @@ const Dashboard = () => {
               borderBottom: `1px solid ${theme.border}`,
             }}
           >
-            <span
-              style={{
-                fontSize: 14,
-                fontWeight: 600,
-                letterSpacing: '0.5px',
-                color: theme.text,
-              }}
-            >
-              INQORA AI
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <img
+                src="/logo.png"
+                alt="Logo"
+                style={{ width: '20px', height: '20px', objectFit: 'cover', borderRadius: '4px' }}
+              />
+              <span
+                className="font-heading"
+                style={{
+                  fontSize: 14,
+                  fontWeight: 600,
+                  letterSpacing: '0.5px',
+                  color: theme.accent,
+                }}
+              >
+                INQORA AI
+              </span>
+            </div>
             <button
               onClick={() => setSidebarOpen(false)}
               style={{
@@ -355,7 +389,7 @@ const Dashboard = () => {
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  {c.title}
+                  {stripMarkdown(c.title)}
                 </span>
               </button>
             ))}
@@ -567,9 +601,10 @@ const Dashboard = () => {
                 }}
               >
                 <h2
+                  className="font-heading"
                   style={{
                     fontSize: 22,
-                    fontWeight: 400,
+                    fontWeight: 600,
                     color: theme.text,
                     marginBottom: 32,
                     textAlign: 'center',
@@ -607,8 +642,8 @@ const Dashboard = () => {
                       boxShadow: theme.shadow,
                     }}
                     onFocus={(e) => {
-                      e.currentTarget.style.borderColor = theme.textMuted
-                      e.currentTarget.style.boxShadow = `0 0 0 3px ${darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'}`
+                      e.currentTarget.style.borderColor = theme.accent
+                      e.currentTarget.style.boxShadow = `0 0 0 3px ${darkMode ? 'rgba(232,130,60,0.15)' : 'rgba(232,130,60,0.1)'}`
                     }}
                     onBlur={(e) => {
                       e.currentTarget.style.borderColor = theme.border
@@ -623,17 +658,17 @@ const Dashboard = () => {
                       right: 8,
                       top: '50%',
                       transform: 'translateY(-50%)',
-                      background: 'none',
+                      background: chatInput.trim() && !isStreaming ? theme.accent : 'none',
                       border: 'none',
                       color: chatInput.trim() && !isStreaming
-                        ? theme.text
+                        ? theme.bg
                         : theme.textMuted,
                       cursor: chatInput.trim() && !isStreaming ? 'pointer' : 'not-allowed',
                       padding: 6,
                       display: 'flex',
                       alignItems: 'center',
                       borderRadius: 6,
-                      transition: 'color 200ms, opacity 200ms',
+                      transition: 'color 200ms, opacity 200ms, background 200ms',
                       opacity: chatInput.trim() && !isStreaming ? 1 : 0.4,
                     }}
                   >
@@ -739,11 +774,12 @@ const Dashboard = () => {
                                   <code
                                     style={{
                                       background: darkMode
-                                        ? 'rgba(255,255,255,0.08)'
-                                        : 'rgba(0,0,0,0.06)',
+                                        ? 'rgba(62,207,142,0.12)'
+                                        : 'rgba(31,169,113,0.08)',
                                       padding: '2px 5px',
                                       borderRadius: 4,
                                       fontSize: 13,
+                                      color: darkMode ? '#8FE3B8' : '#1B7A4F',
                                     }}
                                   >
                                     {children}
@@ -813,7 +849,7 @@ const Dashboard = () => {
                         transition: 'border-color 200ms',
                       }}
                       onFocus={(e) =>
-                        (e.currentTarget.style.borderColor = theme.textMuted)
+                        (e.currentTarget.style.borderColor = theme.accent)
                       }
                       onBlur={(e) =>
                         (e.currentTarget.style.borderColor = theme.border)
@@ -827,17 +863,17 @@ const Dashboard = () => {
                         right: 6,
                         top: '50%',
                         transform: 'translateY(-50%)',
-                        background: 'none',
+                        background: chatInput.trim() && !isStreaming ? theme.accent : 'none',
                         border: 'none',
                         color: chatInput.trim() && !isStreaming
-                          ? theme.text
+                          ? theme.bg
                           : theme.textMuted,
                         cursor: chatInput.trim() && !isStreaming ? 'pointer' : 'not-allowed',
                         padding: 6,
                         display: 'flex',
                         alignItems: 'center',
                         borderRadius: 6,
-                        transition: 'color 200ms, opacity 200ms',
+                        transition: 'color 200ms, opacity 200ms, background 200ms',
                         opacity: chatInput.trim() && !isStreaming ? 1 : 0.4,
                       }}
                     >

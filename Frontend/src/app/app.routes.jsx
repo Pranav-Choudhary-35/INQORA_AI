@@ -9,8 +9,8 @@ const Dashboard = lazy(() => import("./features/chat/pages/Dashboard"));
 
 // Loading fallback component
 const LoadingFallback = () => (
-  <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-    <div className="text-zinc-400">Loading...</div>
+  <div className="min-h-screen bg-bg flex items-center justify-center">
+    <div className="text-text-muted font-sans">Loading...</div>
   </div>
 );
 

@@ -1,5 +1,34 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap');
 @import 'tailwindcss';
 
+@theme {
+  --color-bg: #131313;
+  --color-bg-surface: #1c1b1b;
+  --color-bg-hover: #2a2a2a;
+
+  --color-accent: #00dfc1;
+  --color-accent-hover: #26fedc;
+  --color-accent-muted: #d7fff3;
+
+  --color-text-primary: #e5e2e1;
+  --color-text-muted: #b9cac4;
+
+  --font-heading: 'Geist', sans-serif;
+  --font-sans: 'Geist', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+body {
+  font-family: 'Geist', sans-serif;
+  background-color: #131313;
+  margin: 0;
+  color: #e5e2e1;
+}
+
 .messages::-webkit-scrollbar {
-display: none;
+  display: none;
+}
+
+#root {
+  min-height: 100vh;
 }

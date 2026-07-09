@@ -6,9 +6,9 @@ import { useMemo } from 'react'
  * @returns {string} CSS box-shadow value
  */
 const generateBoxShadows = (n) => {
-  let value = `${Math.floor(Math.random() * 2000)}px ${Math.floor(Math.random() * 2000)}px #FFF`
+  let value = `${Math.floor(Math.random() * 2000)}px ${Math.floor(Math.random() * 2000)}px #F5F1EA`
   for (let i = 2; i <= n; i++) {
-    value += `, ${Math.floor(Math.random() * 2000)}px ${Math.floor(Math.random() * 2000)}px #FFF`
+    value += `, ${Math.floor(Math.random() * 2000)}px ${Math.floor(Math.random() * 2000)}px #F5F1EA`
   }
   return value
 }
@@ -29,7 +29,7 @@ const ParallaxStars = ({ speed = 1, className = '' }) => {
       {/* Keyframes + gradient — injected once per mount */}
       <style>{`
         .parallax-radial-bg {
-          background: radial-gradient(ellipse at bottom, #1B2735 0%, #090A0F 100%);
+          background: radial-gradient(ellipse at bottom, #2A2019 0%, #0F0E0D 100%);
         }
         @keyframes parallaxStarDrift {
           from { transform: translateY(0px); }

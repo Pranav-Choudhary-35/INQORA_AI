@@ -43,6 +43,23 @@ function getContentText(content) {
 
 export function extractStreamToken(chunk) {
     const message = Array.isArray(chunk) ? chunk[ 0 ] : chunk;
+    if (!message) return "";
+
+    // Skip ToolMessage chunks — these are raw tool results flowing back to the LLM,
+    // not user-facing text. type === "tool" covers ToolMessage and ToolMessageChunk.
+    const msgType = message?.type ?? message?._getType?.();
+    if (msgType === "tool") return "";
+
+    // Skip AIMessage chunks that contain ONLY tool_calls (the model deciding which
+    // tool to invoke). These have no meaningful text and must not be streamed.
+    const toolCalls = message?.tool_calls ?? message?.kwargs?.tool_calls;
+    if (toolCalls?.length > 0) {
+        const text = getContentText(
+            message?.content || message?.content_blocks || message?.kwargs?.content
+        );
+        if (!text.trim()) return "";
+    }
+
     return getContentText(
         message?.content ||
         message?.content_blocks ||

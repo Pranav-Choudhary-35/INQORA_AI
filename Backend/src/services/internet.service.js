@@ -10,7 +10,12 @@ export const searchInternet = async ({ query }) => {
         maxResults: 5,
     })
 
-    console.log(JSON.stringify(results))
+    // Format into clean text for the LLM — never expose raw JSON/images to the model output
+    const formatted = results.results
+        .map((r, i) =>
+            `[${i + 1}] ${r.title}\nURL: ${r.url}\n${r.content?.trim() || "No content available."}`
+        )
+        .join("\n\n---\n\n")
 
-    return JSON.stringify(results)
+    return `Search results for: "${query}"\n\n${formatted}`
 }

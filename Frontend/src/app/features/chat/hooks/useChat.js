@@ -1,6 +1,6 @@
 import { initializeSocketConnection } from "../service/chat.socket";
 import { sendMessage, getChats, getMessages, deleteChat } from "../service/chat.api";
-import { setChats, setCurrentChatId, setError, setLoading, createNewChat, addNewMessage, addMessages, appendToLastAiMessage } from "../chat.slice";
+import { setChats, setCurrentChatId, setError, setLoading, createNewChat, addNewMessage, addMessages, appendToLastAiMessage, removeChat } from "../chat.slice";
 import { useDispatch } from "react-redux";
 
 
@@ -152,12 +152,30 @@ export const useChat = () => {
         dispatch(setCurrentChatId(chatId))
     }
 
+    async function handleDeleteChat(chatId) {
+        // Optimistically remove from state
+        dispatch(removeChat(chatId))
+        try {
+            await deleteChat(chatId)
+        } catch (err) {
+            // Determine the right error message based on HTTP status
+            const status = err?.response?.status
+            if (status === 404) {
+                // Already gone — optimistic removal was correct, no rollback needed
+                return { alreadyDeleted: true }
+            }
+            // For any other error, surface it so the caller can restore the item
+            throw err
+        }
+    }
+
     return {
         initializeSocketConnection,
         handleSendMessage,
         handleSendMessageStream,
         handleGetChats,
-        handleOpenChat
+        handleOpenChat,
+        handleDeleteChat,
     }
 
 }

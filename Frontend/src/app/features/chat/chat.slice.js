@@ -47,10 +47,18 @@ const chatSlice = createSlice({
         setError: (state, action) => {
             state.error = action.payload
         },
+        removeChat: (state, action) => {
+            const chatId = action.payload
+            delete state.chats[chatId]
+            // If the deleted chat was the active one, clear it
+            if (state.currentChatId === chatId) {
+                state.currentChatId = null
+            }
+        },
     }
 })
 
-export const { setChats, setCurrentChatId, setLoading, setError, createNewChat, addNewMessage, addMessages, appendToLastAiMessage } = chatSlice.actions
+export const { setChats, setCurrentChatId, setLoading, setError, createNewChat, addNewMessage, addMessages, appendToLastAiMessage, removeChat } = chatSlice.actions
 export default chatSlice.reducer
 
 

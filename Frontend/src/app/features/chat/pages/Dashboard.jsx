@@ -17,6 +17,7 @@ import {
   LogOut,
   MessageSquare,
   ChevronUp,
+  Trash2,
 } from 'lucide-react'
 import '../../../../app/index.css'
 
@@ -46,6 +47,8 @@ const Dashboard = () => {
   const [darkMode, setDarkMode] = useState(true)
   const [profileOpen, setProfileOpen] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
+  // { chatId, item (snapshot for rollback), isDeleting, error }
+  const [deleteConfirm, setDeleteConfirm] = useState(null)
 
   const chats = useSelector((state) => state.chat.chats)
   const currentChatId = useSelector((state) => state.chat.currentChatId)
@@ -148,6 +151,35 @@ const Dashboard = () => {
     setChatInput('')
     setSidebarOpen(false)
   }, [dispatch])
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!deleteConfirm || deleteConfirm.isDeleting) return
+    const { chatId, item } = deleteConfirm
+
+    // Mark as in-flight to prevent double-click
+    setDeleteConfirm(prev => ({ ...prev, isDeleting: true, error: null }))
+
+    try {
+      await chat.handleDeleteChat(chatId)
+      // Success — close modal (state already removed by the hook)
+      setDeleteConfirm(null)
+    } catch (err) {
+      const status = err?.response?.status
+      if (status === 404) {
+        // Already deleted elsewhere — treat as success
+        setDeleteConfirm(null)
+        return
+      }
+      // Restore the item in Redux so the sidebar recovers (hook throws on non-404 errors)
+      // We dispatch setChats externally; simpler: re-fetch chats to restore state
+      chat.handleGetChats()
+      setDeleteConfirm(prev => ({
+        ...prev,
+        isDeleting: false,
+        error: 'Failed to delete. Please try again.',
+      }))
+    }
+  }, [deleteConfirm, chat])
 
   const handleLogout = useCallback(async () => {
     await auth.handleLogout(navigate)
@@ -287,6 +319,27 @@ const Dashboard = () => {
         .dashboard-markdown pre code {
           background: transparent;
           padding: 0;
+        }
+
+        /* Delete button: hidden by default, shown on row hover */
+        .chat-delete-btn {
+          opacity: 0;
+          pointer-events: none;
+        }
+        .chat-row:hover .chat-delete-btn {
+          opacity: 1;
+          pointer-events: auto;
+        }
+        /* On touch devices always show it (no hover state) */
+        @media (hover: none) {
+          .chat-delete-btn {
+            opacity: 1;
+            pointer-events: auto;
+          }
+        }
+        .chat-delete-btn:hover {
+          color: #ef4444 !important;
+          background: rgba(239, 68, 68, 0.12) !important;
         }
       `}</style>
 
@@ -435,60 +488,98 @@ const Dashboard = () => {
                 {chatList.map((item) => {
                   const active = currentChatId === item.id
                   return (
-                    <button
+                    <div
                       key={item.id}
-                      onClick={() => openChat(item.id)}
+                      className="chat-row"
                       style={{
-                        width: '100%',
-                        textAlign: 'left',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 12,
-                        padding: '12px 14px',
+                        position: 'relative',
                         borderRadius: 18,
                         border: `1px solid ${active ? theme.borderStrong : 'transparent'}`,
                         background: active ? theme.accentSoft : 'transparent',
-                        color: active ? theme.text : theme.textSecondary,
-                        cursor: 'pointer',
                       }}
                     >
-                      <div
+                      <button
+                        onClick={() => openChat(item.id)}
                         style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 14,
-                          display: 'grid',
-                          placeItems: 'center',
-                          background: active ? theme.surfaceHover : theme.bgSubtle,
-                          flexShrink: 0,
+                          width: '100%',
+                          textAlign: 'left',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 12,
+                          padding: '12px 44px 12px 14px',
+                          borderRadius: 18,
+                          border: 'none',
+                          background: 'transparent',
+                          color: active ? theme.text : theme.textSecondary,
+                          cursor: 'pointer',
                         }}
                       >
-                        <MessageSquare size={16} />
-                      </div>
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <p
+                        <div
                           style={{
-                            margin: 0,
-                            fontSize: 14,
-                            fontWeight: 500,
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
+                            width: 36,
+                            height: 36,
+                            borderRadius: 14,
+                            display: 'grid',
+                            placeItems: 'center',
+                            background: active ? theme.surfaceHover : theme.bgSubtle,
+                            flexShrink: 0,
                           }}
                         >
-                          {stripMarkdown(item.title)}
-                        </p>
-                        <p
-                          style={{
-                            margin: '4px 0 0',
-                            fontSize: 12,
-                            color: theme.textMuted,
-                          }}
-                        >
-                          {item.messages?.length || 0} messages
-                        </p>
-                      </div>
-                    </button>
+                          <MessageSquare size={16} />
+                        </div>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <p
+                            style={{
+                              margin: 0,
+                              fontSize: 14,
+                              fontWeight: 500,
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                          >
+                            {stripMarkdown(item.title)}
+                          </p>
+                          <p
+                            style={{
+                              margin: '4px 0 0',
+                              fontSize: 12,
+                              color: theme.textMuted,
+                            }}
+                          >
+                            {item.messages?.length || 0} messages
+                          </p>
+                        </div>
+                      </button>
+
+                      {/* Delete button — shown on hover via CSS class */}
+                      <button
+                        className="chat-delete-btn"
+                        aria-label="Delete conversation"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setDeleteConfirm({ chatId: item.id, item, isDeleting: false, error: null })
+                        }}
+                        style={{
+                          position: 'absolute',
+                          right: 10,
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          width: 30,
+                          height: 30,
+                          borderRadius: 10,
+                          border: 'none',
+                          background: 'transparent',
+                          color: theme.textMuted,
+                          display: 'grid',
+                          placeItems: 'center',
+                          cursor: 'pointer',
+                          transition: 'color 140ms ease, background 140ms ease',
+                        }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   )
                 })}
               </div>
@@ -1049,6 +1140,136 @@ const Dashboard = () => {
           </div>
         </main>
       </div>
+
+      {/* ── Delete confirmation modal ── */}
+      {deleteConfirm && (
+        <div
+          className="dashboard-fade"
+          onClick={() => !deleteConfirm.isDeleting && setDeleteConfirm(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.64)',
+            backdropFilter: 'blur(6px)',
+            padding: '0 16px',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: 380,
+              borderRadius: 24,
+              border: `1px solid ${theme.border}`,
+              background: theme.surfaceSolid,
+              padding: '28px 24px 24px',
+            }}
+          >
+            {/* Icon */}
+            <div
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 16,
+                background: 'rgba(239,68,68,0.12)',
+                border: '1px solid rgba(239,68,68,0.22)',
+                display: 'grid',
+                placeItems: 'center',
+                marginBottom: 18,
+              }}
+            >
+              <Trash2 size={20} style={{ color: '#ef4444' }} />
+            </div>
+
+            <p
+              style={{
+                margin: '0 0 6px',
+                fontSize: 16,
+                fontWeight: 600,
+                color: theme.text,
+              }}
+            >
+              Delete conversation?
+            </p>
+            <p style={{ margin: '0 0 22px', fontSize: 14, color: theme.textSecondary, lineHeight: 1.6 }}>
+              This action cannot be undone. The conversation and all its messages will be permanently removed.
+            </p>
+
+            {/* Error message */}
+            {deleteConfirm.error && (
+              <p
+                style={{
+                  margin: '0 0 16px',
+                  fontSize: 13,
+                  color: '#ef4444',
+                  background: 'rgba(239,68,68,0.08)',
+                  border: '1px solid rgba(239,68,68,0.18)',
+                  borderRadius: 12,
+                  padding: '10px 14px',
+                }}
+              >
+                {deleteConfirm.error}
+              </p>
+            )}
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                disabled={deleteConfirm.isDeleting}
+                style={{
+                  flex: 1,
+                  padding: '12px 0',
+                  borderRadius: 14,
+                  border: `1px solid ${theme.border}`,
+                  background: 'transparent',
+                  color: theme.text,
+                  fontSize: 14,
+                  fontWeight: 500,
+                  cursor: deleteConfirm.isDeleting ? 'not-allowed' : 'pointer',
+                  opacity: deleteConfirm.isDeleting ? 0.5 : 1,
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                disabled={deleteConfirm.isDeleting}
+                style={{
+                  flex: 1,
+                  padding: '12px 0',
+                  borderRadius: 14,
+                  border: 'none',
+                  background: deleteConfirm.isDeleting ? 'rgba(239,68,68,0.5)' : '#ef4444',
+                  color: '#fff',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: deleteConfirm.isDeleting ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                }}
+              >
+                {deleteConfirm.isDeleting ? (
+                  <>
+                    <span style={{ opacity: 0.7 }}>Deleting…</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={14} />
+                    Delete
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

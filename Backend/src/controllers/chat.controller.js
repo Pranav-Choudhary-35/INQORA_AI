@@ -1,4 +1,4 @@
-import { generateResponse, generateChatTitle, streamResponse, extractStreamToken } from "../services/ai.service.js";
+import { generateResponse, generateChatTitle, streamResponse, extractStreamToken, sanitizeResponse } from "../services/ai.service.js";
 import chatModel from "../models/chat.model.js"
 import messageModel from "../models/message.model.js";
 
@@ -29,7 +29,8 @@ export async function sendMessage(req, res) {
     // Use lean() for read-only queries to improve performance
     const messages = await messageModel.find({ chat: chatId || chat._id }).lean();
 
-    const result = await generateResponse(messages);
+    const rawResult = await generateResponse(messages);
+    const result = sanitizeResponse(rawResult);
 
     const aiMessage = await messageModel.create({
         chat: chatId || chat._id,
@@ -87,8 +88,9 @@ export async function streamMessage(req, res) {
         let content = "";
 
         for await (const chunk of stream) {
-            const token = extractStreamToken(chunk);
-            if (token) {
+            const rawToken = extractStreamToken(chunk);
+            if (rawToken) {
+                const token = sanitizeResponse(rawToken);
                 content += token;
                 res.write(`data: ${JSON.stringify({ token })}\n\n`);
             }

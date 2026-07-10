@@ -20,22 +20,18 @@ import {
 } from 'lucide-react'
 import '../../../../app/index.css'
 
-/**
- * Strip markdown formatting characters from a string.
- * Removes **, *, __, _, ~~, `, #, etc. to produce clean display text.
- */
 const stripMarkdown = (text) => {
   if (!text || typeof text !== 'string') return text || 'Untitled Chat'
   return text
-    .replace(/#{1,6}\s?/g, '')      // headings
-    .replace(/\*\*(.+?)\*\*/g, '$1') // bold **text**
-    .replace(/__(.+?)__/g, '$1')     // bold __text__
-    .replace(/\*(.+?)\*/g, '$1')     // italic *text*
-    .replace(/_(.+?)_/g, '$1')       // italic _text_
-    .replace(/~~(.+?)~~/g, '$1')     // strikethrough
-    .replace(/`(.+?)`/g, '$1')       // inline code
-    .replace(/\[(.+?)\]\(.+?\)/g, '$1') // links
-    .replace(/!\[.*?\]\(.+?\)/g, '')    // images
+    .replace(/#{1,6}\s?/g, '')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/__(.+?)__/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/_(.+?)_/g, '$1')
+    .replace(/~~(.+?)~~/g, '$1')
+    .replace(/`(.+?)`/g, '$1')
+    .replace(/\[(.+?)\]\(.+?\)/g, '$1')
+    .replace(/!\[.*?\]\(.+?\)/g, '')
     .trim() || 'Untitled Chat'
 }
 
@@ -44,18 +40,18 @@ const Dashboard = () => {
   const auth = useAuth()
   const dispatch = useDispatch()
   const navigate = useNavigate()
-  const [chatInput, setChatInput] = useState('')
-  const chats = useSelector((state) => state.chat.chats)
-  const currentChatId = useSelector((state) => state.chat.currentChatId)
-  const user = useSelector((state) => state.auth.user)
 
+  const [chatInput, setChatInput] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [darkMode, setDarkMode] = useState(true)
   const [profileOpen, setProfileOpen] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
 
+  const chats = useSelector((state) => state.chat.chats)
+  const currentChatId = useSelector((state) => state.chat.currentChatId)
+  const user = useSelector((state) => state.auth.user)
+
   const messagesEndRef = useRef(null)
-  const inputRef = useRef(null)
   const profileRef = useRef(null)
   const eventSourceRef = useRef(null)
   const abortRef = useRef(false)
@@ -74,18 +70,28 @@ const Dashboard = () => {
     }
   }, [])
 
-  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    const savedTheme = window.localStorage.getItem('dashboard-theme')
+    // Default to dark if no preference stored (matches auth page theme)
+    if (savedTheme === 'light') setDarkMode(false)
+    else setDarkMode(true)
+  }, [])
+
+  useEffect(() => {
+    window.localStorage.setItem('dashboard-theme', darkMode ? 'dark' : 'light')
+  }, [darkMode])
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chats, currentChatId])
 
-  // Close profile popup on outside click
   useEffect(() => {
-    const handleClick = (e) => {
-      if (profileRef.current && !profileRef.current.contains(e.target)) {
+    const handleClick = (event) => {
+      if (profileRef.current && !profileRef.current.contains(event.target)) {
         setProfileOpen(false)
       }
     }
+
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
@@ -98,41 +104,48 @@ const Dashboard = () => {
     return Object.values(chats)
   }, [chats])
 
+  const activeChat = currentChatId ? chats[currentChatId] : null
   const hasMessages = currentChatMessages.length > 0
 
-  const handleSubmitMessage = useCallback(
-    (event) => {
-      event.preventDefault()
-      if (isStreaming) return
-      const trimmedMessage = chatInput.trim()
-      if (!trimmedMessage) return
-      setIsStreaming(true)
-      abortRef.current = false
-      chat.handleSendMessageStream({
-        message: trimmedMessage,
-        chatId: currentChatId,
-        controllerRef: eventSourceRef,
-        onDone: () => {
-          if (!abortRef.current) {
-            setIsStreaming(false)
-          }
-        },
-      })
-      setChatInput('')
-    },
-    [chatInput, currentChatId, chat, isStreaming]
-  )
+  const suggestionPrompts = [
+    'Summarize my current project status',
+    'Help me plan the next sprint',
+    'Review this feature idea critically',
+    'Draft a professional client update',
+  ]
 
-  const openChat = useCallback(
-    (chatId) => {
-      chat.handleOpenChat(chatId, chats)
-      setSidebarOpen(false)
-    },
-    [chat, chats]
-  )
+  const handleSubmitMessage = useCallback((event) => {
+    event.preventDefault()
+    if (isStreaming) return
+
+    const trimmedMessage = chatInput.trim()
+    if (!trimmedMessage) return
+
+    setIsStreaming(true)
+    abortRef.current = false
+
+    chat.handleSendMessageStream({
+      message: trimmedMessage,
+      chatId: currentChatId,
+      controllerRef: eventSourceRef,
+      onDone: () => {
+        if (!abortRef.current) {
+          setIsStreaming(false)
+        }
+      },
+    })
+
+    setChatInput('')
+  }, [chat, chatInput, currentChatId, isStreaming])
+
+  const openChat = useCallback((chatId) => {
+    chat.handleOpenChat(chatId, chats)
+    setSidebarOpen(false)
+  }, [chat, chats])
 
   const handleNewChat = useCallback(() => {
     dispatch(setCurrentChatId(null))
+    setChatInput('')
     setSidebarOpen(false)
   }, [dispatch])
 
@@ -140,751 +153,901 @@ const Dashboard = () => {
     await auth.handleLogout(navigate)
   }, [auth, navigate])
 
-  // --- Theme tokens ---
   const theme = darkMode
     ? {
-        bg: '#0B0D0C',
-        surface: '#151917',
-        surfaceHover: '#1E2320',
-        border: '#262B28',
-        borderLight: '#333A35',
-        text: '#F3F5F2',
-        textSecondary: '#8B958E',
-        textMuted: '#565F59',
-        inputBg: '#151917',
-        userBubble: '#1E2320',
-        accent: '#3ECF8E',
-        accentHover: '#56DFA0',
-        shadow: '0 1px 3px rgba(0,0,0,0.3)',
+        // ── Emerald dark theme — matches auth pages (index.css tokens) ──
+        bg: '#131313',
+        bgSubtle: '#1c1b1b',
+        surface: 'rgba(28, 27, 27, 0.88)',
+        surfaceSolid: '#1c1b1b',
+        surfaceHover: '#2a2a2a',
+        border: 'rgba(0, 223, 193, 0.12)',
+        borderStrong: 'rgba(0, 223, 193, 0.24)',
+        text: '#e5e2e1',
+        textSecondary: '#b9cac4',
+        textMuted: '#708099',
+        accent: '#00dfc1',
+        accentHover: '#26fedc',
+        accentSoft: 'rgba(0, 223, 193, 0.10)',
+        userBubble: 'rgba(0, 223, 193, 0.10)',
+        pageGradient:
+          'radial-gradient(circle at 20% 30%, rgba(0,223,193,0.06), transparent 32%), radial-gradient(circle at 80% 72%, rgba(38,254,220,0.07), transparent 36%), linear-gradient(180deg, #131313 0%, #0f1612 100%)',
       }
     : {
-        bg: '#FAFAF8',
-        surface: '#FFFFFF',
-        surfaceHover: '#EFF3F0',
-        border: '#E1E7E3',
-        borderLight: '#EBEFEC',
-        text: '#0F1210',
-        textSecondary: '#5C655F',
-        textMuted: '#94A099',
-        inputBg: '#FFFFFF',
-        userBubble: '#EFF3F0',
-        accent: '#1FA971',
-        accentHover: '#178A5C',
-        shadow: '0 1px 3px rgba(0,0,0,0.06)',
+        bg: '#f4f7fb',
+        bgSubtle: '#edf3f9',
+        surface: 'rgba(255, 255, 255, 0.88)',
+        surfaceSolid: '#ffffff',
+        surfaceHover: '#eef4fb',
+        border: 'rgba(31, 41, 55, 0.10)',
+        borderStrong: 'rgba(31, 41, 55, 0.18)',
+        text: '#142033',
+        textSecondary: '#516177',
+        textMuted: '#8796ac',
+        accent: '#00a896',
+        accentHover: '#00c4af',
+        accentSoft: 'rgba(0, 168, 150, 0.08)',
+        userBubble: 'rgba(0, 168, 150, 0.10)',
+        pageGradient:
+          'radial-gradient(circle at top left, rgba(0,168,150,0.06), transparent 28%), radial-gradient(circle at top right, rgba(0,223,193,0.06), transparent 22%), linear-gradient(180deg, #f7f9fc 0%, #eef3f8 100%)',
       }
 
   return (
     <>
-      {/* Google Font */}
       <style>{`
+        .dashboard-root,
         .dashboard-root * {
-          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+          box-sizing: border-box;
         }
 
-        .dashboard-root h1,
-        .dashboard-root h2,
-        .dashboard-root h3,
-        .dashboard-root .font-heading {
-          font-family: 'Space Grotesk', sans-serif;
+        .dashboard-root * {
+          font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
         }
 
         .dashboard-root ::-webkit-scrollbar {
-          width: 4px;
+          width: 8px;
+          height: 8px;
         }
+
         .dashboard-root ::-webkit-scrollbar-track {
           background: transparent;
         }
+
         .dashboard-root ::-webkit-scrollbar-thumb {
-          background: ${theme.borderLight};
-          border-radius: 4px;
+          background: ${theme.borderStrong};
+          border-radius: 999px;
         }
 
-        .fade-in {
-          animation: fadeIn 250ms ease-out;
+        .dashboard-root {
+          --bg: ${theme.bg};
+          --bg-subtle: ${theme.bgSubtle};
+          --surface: ${theme.surface};
+          --surface-solid: ${theme.surfaceSolid};
+          --surface-hover: ${theme.surfaceHover};
+          --border: ${theme.border};
+          --border-strong: ${theme.borderStrong};
+          --text: ${theme.text};
+          --text-secondary: ${theme.textSecondary};
+          --text-muted: ${theme.textMuted};
+          --accent: ${theme.accent};
+          --accent-hover: ${theme.accentHover};
+          --accent-soft: ${theme.accentSoft};
+          --user-bubble: ${theme.userBubble};
         }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(6px); }
+
+        .dashboard-fade {
+          animation: dashboardFade 180ms ease-out;
+        }
+
+        @keyframes dashboardFade {
+          from { opacity: 0; transform: translateY(4px); }
           to { opacity: 1; transform: translateY(0); }
         }
 
-        .slide-in-left {
-          animation: slideLeft 250ms ease-out;
+        .dashboard-input {
+          background: var(--surface-solid);
+          border: 1px solid var(--border);
+          color: var(--text);
+          transition: border-color 140ms ease, background-color 140ms ease;
         }
-        @keyframes slideLeft {
-          from { transform: translateX(-100%); }
-          to { transform: translateX(0); }
+
+        .dashboard-input:focus {
+          outline: none;
+          border-color: var(--accent);
+        }
+
+        .dashboard-markdown p {
+          margin: 0 0 12px;
+          line-height: 1.7;
+        }
+
+        .dashboard-markdown ul,
+        .dashboard-markdown ol {
+          margin: 0 0 12px;
+          padding-left: 20px;
+        }
+
+        .dashboard-markdown pre {
+          margin: 0 0 12px;
+          overflow-x: auto;
+          border-radius: 16px;
+          background: var(--bg-subtle);
+          border: 1px solid var(--border);
+          padding: 14px;
+        }
+
+        .dashboard-markdown code {
+          background: var(--accent-soft);
+          color: var(--accent);
+          border-radius: 6px;
+          padding: 2px 6px;
+          font-size: 0.92em;
+        }
+
+        .dashboard-markdown pre code {
+          background: transparent;
+          padding: 0;
         }
       `}</style>
 
       <div
         className="dashboard-root"
         style={{
-          display: 'flex',
           height: '100vh',
           width: '100%',
-          background: theme.bg,
-          color: theme.text,
           overflow: 'hidden',
+          background: theme.pageGradient,
+          color: theme.text,
           position: 'relative',
         }}
       >
-        {/* ─── SIDEBAR OVERLAY (mobile) ─── */}
         {sidebarOpen && (
           <div
             onClick={() => setSidebarOpen(false)}
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(0,0,0,0.4)',
               zIndex: 40,
-              transition: 'opacity 250ms',
+              background: darkMode ? 'rgba(10, 12, 11, 0.72)' : 'rgba(15, 23, 42, 0.16)',
             }}
           />
         )}
 
-        {/* ─── SIDEBAR ─── */}
-        <aside
-          style={{
-            position: 'fixed',
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: 260,
-            background: theme.surface,
-            borderRight: `1px solid ${theme.border}`,
-            display: 'flex',
-            flexDirection: 'column',
-            zIndex: 50,
-            transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
-            transition: 'transform 250ms ease',
-            boxShadow: sidebarOpen ? '4px 0 12px rgba(0,0,0,0.1)' : 'none',
-          }}
-        >
-          {/* Sidebar header */}
-          <div
+        {sidebarOpen && (
+          <aside
+            className="dashboard-fade"
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '16px 16px 12px',
-              borderBottom: `1px solid ${theme.border}`,
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <img
-                src="/logo.png"
-                alt="Logo"
-                style={{ width: '20px', height: '20px', objectFit: 'cover', borderRadius: '4px' }}
-              />
-              <span
-                className="font-heading"
-                style={{
-                  fontSize: 14,
-                  fontWeight: 600,
-                  letterSpacing: '0.5px',
-                  color: theme.accent,
-                }}
-              >
-                INQORA AI
-              </span>
-            </div>
-            <button
-              onClick={() => setSidebarOpen(false)}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: theme.textSecondary,
-                cursor: 'pointer',
-                padding: 4,
-                display: 'flex',
-                alignItems: 'center',
-              }}
-            >
-              <X size={18} />
-            </button>
-          </div>
-
-          {/* New Chat button */}
-          <div style={{ padding: '12px 12px 8px' }}>
-            <button
-              onClick={handleNewChat}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '10px 12px',
-                background: 'none',
-                border: `1px solid ${theme.border}`,
-                borderRadius: 8,
-                color: theme.text,
-                fontSize: 13,
-                fontWeight: 500,
-                cursor: 'pointer',
-                transition: 'background 200ms',
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.background = theme.surfaceHover)
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.background = 'none')
-              }
-            >
-              <Plus size={16} />
-              New Chat
-            </button>
-          </div>
-
-          {/* Chat list */}
-          <div
-            style={{
-              flex: 1,
-              overflowY: 'auto',
-              padding: '4px 12px',
-            }}
-          >
-            {chatList.map((c) => (
-              <button
-                onClick={() => openChat(c.id)}
-                key={c.id}
-                style={{
-                  width: '100%',
-                  textAlign: 'left',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '9px 10px',
-                  background:
-                    currentChatId === c.id ? theme.surfaceHover : 'none',
-                  border: 'none',
-                  borderRadius: 6,
-                  color:
-                    currentChatId === c.id
-                      ? theme.text
-                      : theme.textSecondary,
-                  fontSize: 13,
-                  cursor: 'pointer',
-                  transition: 'background 200ms, color 200ms',
-                  marginBottom: 2,
-                  overflow: 'hidden',
-                  whiteSpace: 'nowrap',
-                  textOverflow: 'ellipsis',
-                }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = theme.surfaceHover)
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.background =
-                    currentChatId === c.id ? theme.surfaceHover : 'transparent')
-                }
-              >
-                <MessageSquare
-                  size={14}
-                  style={{ flexShrink: 0, opacity: 0.5 }}
-                />
-                <span
-                  style={{
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {stripMarkdown(c.title)}
-                </span>
-              </button>
-            ))}
-          </div>
-
-          {/* Profile section */}
-          <div
-            ref={profileRef}
-            style={{
-              position: 'relative',
-              borderTop: `1px solid ${theme.border}`,
-              padding: '8px 12px',
-            }}
-          >
-            {/* Profile popup */}
-            {profileOpen && (
-              <div
-                className="fade-in"
-                style={{
-                  position: 'absolute',
-                  bottom: '100%',
-                  left: 12,
-                  right: 12,
-                  marginBottom: 4,
-                  background: theme.surface,
-                  border: `1px solid ${theme.border}`,
-                  borderRadius: 8,
-                  boxShadow: theme.shadow,
-                  overflow: 'hidden',
-                }}
-              >
-                <button
-                  onClick={handleLogout}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    padding: '10px 12px',
-                    background: 'none',
-                    border: 'none',
-                    color: '#e55',
-                    fontSize: 13,
-                    cursor: 'pointer',
-                    transition: 'background 200ms',
-                  }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.background = theme.surfaceHover)
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.background = 'transparent')
-                  }
-                >
-                  <LogOut size={14} />
-                  Log out
-                </button>
-              </div>
-            )}
-
-            <button
-              onClick={() => setProfileOpen(!profileOpen)}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                padding: '10px 10px',
-                background: 'none',
-                border: 'none',
-                borderRadius: 6,
-                color: theme.text,
-                fontSize: 13,
-                cursor: 'pointer',
-                transition: 'background 200ms',
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.background = theme.surfaceHover)
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.background = 'transparent')
-              }
-            >
-              <div
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: '50%',
-                  background: theme.surfaceHover,
-                  border: `1px solid ${theme.border}`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <User size={14} style={{ opacity: 0.6 }} />
-              </div>
-              <span
-                style={{
-                  flex: 1,
-                  textAlign: 'left',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  fontWeight: 500,
-                }}
-              >
-                {user?.fullname || user?.username || 'User'}
-              </span>
-              <ChevronUp
-                size={14}
-                style={{
-                  opacity: 0.4,
-                  transform: profileOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                  transition: 'transform 200ms',
-                }}
-              />
-            </button>
-          </div>
-        </aside>
-
-        {/* ─── MAIN AREA ─── */}
-        <div
-          style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            height: '100vh',
-            minWidth: 0,
-          }}
-        >
-          {/* ─── TOP BAR ─── */}
-          <header
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '0 16px',
-              height: 48,
-              borderBottom: `1px solid ${theme.border}`,
-              background: theme.surface,
-              flexShrink: 0,
-            }}
-          >
-            <button
-              onClick={() => setSidebarOpen(true)}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: theme.textSecondary,
-                cursor: 'pointer',
-                padding: 6,
-                display: 'flex',
-                alignItems: 'center',
-                borderRadius: 6,
-                transition: 'color 200ms',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = theme.text)}
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.color = theme.textSecondary)
-              }
-            >
-              <Menu size={20} />
-            </button>
-
-            <button
-              onClick={() => setDarkMode(!darkMode)}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: theme.textSecondary,
-                cursor: 'pointer',
-                padding: 6,
-                display: 'flex',
-                alignItems: 'center',
-                borderRadius: 6,
-                transition: 'color 200ms',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = theme.text)}
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.color = theme.textSecondary)
-              }
-            >
-              {darkMode ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
-          </header>
-
-          {/* ─── CHAT CONTENT ─── */}
-          <div
-            style={{
-              flex: 1,
+              position: 'fixed',
+              inset: '0 auto 0 0',
+              zIndex: 50,
+              width: 'min(320px, 86vw)',
+              height: '100vh',
               display: 'flex',
               flexDirection: 'column',
-              overflow: 'hidden',
-              position: 'relative',
+              background: theme.surface,
+              backdropFilter: 'blur(18px)',
+              borderRight: `1px solid ${theme.border}`,
             }}
           >
-            {!hasMessages ? (
-              /* ─── INITIAL STATE: centered input ─── */
-              <div
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '20px',
+                borderBottom: `1px solid ${theme.border}`,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div
+                  style={{
+                    width: 42,
+                    height: 42,
+                    borderRadius: 16,
+                    display: 'grid',
+                    placeItems: 'center',
+                    background: theme.accentSoft,
+                    border: `1px solid ${theme.border}`,
+                  }}
+                >
+                  <img
+                    src="/logo.png"
+                    alt="Logo"
+                    style={{ width: 22, height: 22, objectFit: 'contain' }}
+                  />
+                </div>
+                <div>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 11,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.22em',
+                      color: theme.textMuted,
+                    }}
+                  >
+                    Workspace
+                  </p>
+                  <p style={{ margin: '4px 0 0', fontSize: 16, fontWeight: 600 }}>
+                    Inqora AI
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSidebarOpen(false)}
                 style={{
-                  flex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '0 24px',
-                  transition: 'opacity 300ms',
+                  width: 40,
+                  height: 40,
+                  borderRadius: 14,
+                  border: `1px solid ${theme.border}`,
+                  background: theme.surfaceSolid,
+                  color: theme.text,
+                  display: 'grid',
+                  placeItems: 'center',
+                  cursor: 'pointer',
                 }}
               >
-                <h2
-                  className="font-heading"
-                  style={{
-                    fontSize: 22,
-                    fontWeight: 600,
-                    color: theme.text,
-                    marginBottom: 32,
-                    textAlign: 'center',
-                    letterSpacing: '-0.3px',
-                  }}
-                >
-                  How can INQORA AI assist you?
-                </h2>
+                <X size={18} />
+              </button>
+            </div>
 
-                <form
-                  onSubmit={handleSubmitMessage}
-                  style={{
-                    width: '100%',
-                    maxWidth: 580,
-                    position: 'relative',
-                  }}
-                >
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    disabled={isStreaming}
-                    placeholder="Ask anything..."
-                    style={{
-                      width: '100%',
-                      padding: '14px 48px 14px 16px',
-                      background: theme.inputBg,
-                      border: `1px solid ${theme.border}`,
-                      borderRadius: 12,
-                      fontSize: 15,
-                      color: theme.text,
-                      outline: 'none',
-                      transition: 'border-color 200ms, box-shadow 200ms',
-                      boxShadow: theme.shadow,
-                    }}
-                    onFocus={(e) => {
-                      e.currentTarget.style.borderColor = theme.accent
-                      e.currentTarget.style.boxShadow = `0 0 0 3px ${darkMode ? 'rgba(232,130,60,0.15)' : 'rgba(232,130,60,0.1)'}`
-                    }}
-                    onBlur={(e) => {
-                      e.currentTarget.style.borderColor = theme.border
-                      e.currentTarget.style.boxShadow = theme.shadow
-                    }}
-                  />
-                  <button
-                    type="submit"
-                    disabled={!chatInput.trim() || isStreaming}
-                    style={{
-                      position: 'absolute',
-                      right: 8,
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      background: chatInput.trim() && !isStreaming ? theme.accent : 'none',
-                      border: 'none',
-                      color: chatInput.trim() && !isStreaming
-                        ? theme.bg
-                        : theme.textMuted,
-                      cursor: chatInput.trim() && !isStreaming ? 'pointer' : 'not-allowed',
-                      padding: 6,
-                      display: 'flex',
-                      alignItems: 'center',
-                      borderRadius: 6,
-                      transition: 'color 200ms, opacity 200ms, background 200ms',
-                      opacity: chatInput.trim() && !isStreaming ? 1 : 0.4,
-                    }}
-                  >
-                    <Send size={18} />
-                  </button>
-                </form>
-              </div>
-            ) : (
-              /* ─── CHAT STATE: messages + bottom input ─── */
-              <>
-                {/* Messages */}
-                <div
-                  className="messages"
-                  style={{
-                    flex: 1,
-                    overflowY: 'auto',
-                    padding: '24px 16px 24px',
-                  }}
-                >
-                  <div
-                    style={{
-                      maxWidth: 680,
-                      margin: '0 auto',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 4,
-                    }}
-                  >
-                    {currentChatMessages.map((message, idx) => (
+            <div style={{ padding: '16px 16px 8px' }}>
+              <button
+                onClick={handleNewChat}
+                style={{
+                  width: '100%',
+                  border: 'none',
+                  borderRadius: 18,
+                  background: theme.accent,
+                  color: theme.bg,
+                  padding: '14px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 10,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                <Plus size={16} />
+                New Chat
+              </button>
+            </div>
+
+            <div style={{ padding: '8px 18px 10px' }}>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 11,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.22em',
+                  color: theme.textMuted,
+                }}
+              >
+                Recent Conversations
+              </p>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0 12px 12px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {chatList.map((item) => {
+                  const active = currentChatId === item.id
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => openChat(item.id)}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                        padding: '12px 14px',
+                        borderRadius: 18,
+                        border: `1px solid ${active ? theme.borderStrong : 'transparent'}`,
+                        background: active ? theme.accentSoft : 'transparent',
+                        color: active ? theme.text : theme.textSecondary,
+                        cursor: 'pointer',
+                      }}
+                    >
                       <div
-                        key={idx}
-                        className="fade-in"
                         style={{
-                          display: 'flex',
-                          justifyContent:
-                            message.role === 'user' ? 'flex-end' : 'flex-start',
-                          marginBottom: message.role === 'user' ? 4 : 12,
+                          width: 36,
+                          height: 36,
+                          borderRadius: 14,
+                          display: 'grid',
+                          placeItems: 'center',
+                          background: active ? theme.surfaceHover : theme.bgSubtle,
+                          flexShrink: 0,
                         }}
                       >
-                        <div
+                        <MessageSquare size={16} />
+                      </div>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <p
                           style={{
-                            maxWidth: '80%',
-                            padding:
-                              message.role === 'user'
-                                ? '10px 14px'
-                                : '10px 2px',
-                            borderRadius:
-                              message.role === 'user' ? '12px 12px 4px 12px' : 0,
-                            background:
-                              message.role === 'user'
-                                ? theme.userBubble
-                                : 'transparent',
-                            color:
-                              message.role === 'user'
-                                ? theme.text
-                                : theme.text,
+                            margin: 0,
                             fontSize: 14,
-                            lineHeight: 1.65,
-                            letterSpacing: '-0.1px',
+                            fontWeight: 500,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
                           }}
                         >
-                          {message.role === 'user' ? (
-                            <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-                              {message.content}
-                            </p>
-                          ) : (
-                            <ReactMarkdown
-                              components={{
-                                p: ({ children }) => (
-                                  <p
-                                    style={{
-                                      marginBottom: 10,
-                                      marginTop: 0,
-                                      lineHeight: 1.7,
-                                    }}
-                                  >
-                                    {children}
-                                  </p>
-                                ),
-                                ul: ({ children }) => (
-                                  <ul
-                                    style={{
-                                      marginBottom: 10,
-                                      paddingLeft: 20,
-                                      listStyleType: 'disc',
-                                    }}
-                                  >
-                                    {children}
-                                  </ul>
-                                ),
-                                ol: ({ children }) => (
-                                  <ol
-                                    style={{
-                                      marginBottom: 10,
-                                      paddingLeft: 20,
-                                      listStyleType: 'decimal',
-                                    }}
-                                  >
-                                    {children}
-                                  </ol>
-                                ),
-                                code: ({ children }) => (
-                                  <code
-                                    style={{
-                                      background: darkMode
-                                        ? 'rgba(62,207,142,0.12)'
-                                        : 'rgba(31,169,113,0.08)',
-                                      padding: '2px 5px',
-                                      borderRadius: 4,
-                                      fontSize: 13,
-                                      color: darkMode ? '#8FE3B8' : '#1B7A4F',
-                                    }}
-                                  >
-                                    {children}
-                                  </code>
-                                ),
-                                pre: ({ children }) => (
-                                  <pre
-                                    style={{
-                                      marginBottom: 10,
-                                      overflowX: 'auto',
-                                      borderRadius: 8,
-                                      background: darkMode
-                                        ? 'rgba(255,255,255,0.05)'
-                                        : 'rgba(0,0,0,0.04)',
-                                      padding: 14,
-                                      fontSize: 13,
-                                    }}
-                                  >
-                                    {children}
-                                  </pre>
-                                ),
-                              }}
-                              remarkPlugins={[remarkGfm]}
-                            >
-                              {message.content}
-                            </ReactMarkdown>
-                          )}
-                        </div>
+                          {stripMarkdown(item.title)}
+                        </p>
+                        <p
+                          style={{
+                            margin: '4px 0 0',
+                            fontSize: 12,
+                            color: theme.textMuted,
+                          }}
+                        >
+                          {item.messages?.length || 0} messages
+                        </p>
                       </div>
-                    ))}
-                    <div ref={messagesEndRef} />
-                  </div>
-                </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
 
-                {/* Bottom input */}
+            <div
+              ref={profileRef}
+              style={{
+                position: 'relative',
+                borderTop: `1px solid ${theme.border}`,
+                padding: 16,
+              }}
+            >
+              {profileOpen && (
+                <div
+                  className="dashboard-fade"
+                  style={{
+                    position: 'absolute',
+                    left: 16,
+                    right: 16,
+                    bottom: 'calc(100% + 10px)',
+                    background: theme.surfaceSolid,
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: 18,
+                    overflow: 'hidden',
+                  }}
+                >
+                  <button
+                    onClick={handleLogout}
+                    style={{
+                      width: '100%',
+                      border: 'none',
+                      background: 'transparent',
+                      padding: '14px 16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      color: '#ef4444',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <LogOut size={16} />
+                    Log out
+                  </button>
+                </div>
+              )}
+
+              <button
+                onClick={() => setProfileOpen((value) => !value)}
+                style={{
+                  width: '100%',
+                  border: `1px solid ${theme.border}`,
+                  borderRadius: 18,
+                  background: theme.surfaceSolid,
+                  padding: '12px 14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  textAlign: 'left',
+                  color: theme.text,
+                  cursor: 'pointer',
+                }}
+              >
                 <div
                   style={{
-                    borderTop: `1px solid ${theme.border}`,
-                    padding: '12px 16px',
-                    background: theme.surface,
+                    width: 40,
+                    height: 40,
+                    borderRadius: 14,
+                    display: 'grid',
+                    placeItems: 'center',
+                    background: theme.surfaceHover,
                     flexShrink: 0,
                   }}
                 >
-                  <form
-                    onSubmit={handleSubmitMessage}
+                  <User size={17} />
+                </div>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <p
                     style={{
-                      maxWidth: 680,
-                      margin: '0 auto',
-                      position: 'relative',
+                      margin: 0,
+                      fontSize: 14,
+                      fontWeight: 600,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
                     }}
                   >
-                    <input
-                      type="text"
-                      value={chatInput}
-                      onChange={(e) => setChatInput(e.target.value)}
-                      disabled={isStreaming}
-                      placeholder="Type a message..."
+                    {user?.fullname || user?.username || 'User'}
+                  </p>
+                  <p
+                    style={{
+                      margin: '4px 0 0',
+                      fontSize: 12,
+                      color: theme.textMuted,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {user?.email || 'Active account'}
+                  </p>
+                </div>
+                <ChevronUp
+                  size={16}
+                  style={{
+                    transform: profileOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 140ms ease',
+                    flexShrink: 0,
+                  }}
+                />
+              </button>
+            </div>
+          </aside>
+        )}
+
+        <main
+          style={{
+            height: '100vh',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}
+        >
+          <header
+            style={{
+              flexShrink: 0,
+              borderBottom: `1px solid ${theme.border}`,
+              background: theme.surface,
+              backdropFilter: 'blur(18px)',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 16,
+                padding: '16px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                <button
+                  onClick={() => setSidebarOpen(true)}
+                  style={{
+                    width: 42,
+                    height: 42,
+                    borderRadius: 16,
+                    border: `1px solid ${theme.border}`,
+                    background: theme.surfaceSolid,
+                    color: theme.text,
+                    display: 'grid',
+                    placeItems: 'center',
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                  }}
+                >
+                  <Menu size={18} />
+                </button>
+
+                <div style={{ minWidth: 0 }}>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 11,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.22em',
+                      color: theme.textMuted,
+                    }}
+                  >
+                    {hasMessages ? 'Conversation' : 'Dashboard'}
+                  </p>
+                  <h2
+                    style={{
+                      margin: '4px 0 0',
+                      fontSize: 20,
+                      fontWeight: 600,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {hasMessages
+                      ? stripMarkdown(activeChat?.title || 'Current chat')
+                      : 'What do you want to work on today?'}
+                  </h2>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setDarkMode((value) => !value)}
+                aria-label="Toggle theme"
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 16,
+                  border: `1px solid ${theme.border}`,
+                  background: theme.surfaceSolid,
+                  color: theme.text,
+                  display: 'grid',
+                  placeItems: 'center',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                }}
+              >
+                {darkMode ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
+            </div>
+          </header>
+
+          <div
+            style={{
+              minHeight: 0,
+              flex: 1,
+              overflow: 'hidden',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16,
+            }}
+          >
+            {!hasMessages ? (
+              <div
+                style={{
+                  flex: 1,
+                  overflowY: 'auto',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <div style={{ width: '100%', maxWidth: 980 }}>
+                  <div style={{ maxWidth: 680, marginBottom: 28 }}>
+                    <p
                       style={{
-                        width: '100%',
-                        padding: '12px 48px 12px 16px',
-                        background: theme.inputBg,
-                        border: `1px solid ${theme.border}`,
-                        borderRadius: 10,
-                        fontSize: 14,
-                        color: theme.text,
-                        outline: 'none',
-                        transition: 'border-color 200ms',
-                      }}
-                      onFocus={(e) =>
-                        (e.currentTarget.style.borderColor = theme.accent)
-                      }
-                      onBlur={(e) =>
-                        (e.currentTarget.style.borderColor = theme.border)
-                      }
-                    />
-                    <button
-                      type="submit"
-                      disabled={!chatInput.trim() || isStreaming}
-                      style={{
-                        position: 'absolute',
-                        right: 6,
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        background: chatInput.trim() && !isStreaming ? theme.accent : 'none',
-                        border: 'none',
-                        color: chatInput.trim() && !isStreaming
-                          ? theme.bg
-                          : theme.textMuted,
-                        cursor: chatInput.trim() && !isStreaming ? 'pointer' : 'not-allowed',
-                        padding: 6,
-                        display: 'flex',
-                        alignItems: 'center',
-                        borderRadius: 6,
-                        transition: 'color 200ms, opacity 200ms, background 200ms',
-                        opacity: chatInput.trim() && !isStreaming ? 1 : 0.4,
+                        margin: 0,
+                        fontSize: 11,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.22em',
+                        color: theme.textMuted,
                       }}
                     >
-                      <Send size={16} />
-                    </button>
-                  </form>
+                      AI Workspace
+                    </p>
+                    <h3
+                      style={{
+                        margin: '16px 0 0',
+                        fontSize: 'clamp(2rem, 4vw, 3.6rem)',
+                        lineHeight: 1.05,
+                        fontWeight: 700,
+                      }}
+                    >
+                      Ask, analyze, and iterate from one workspace.
+                    </h3>
+                    <p
+                      style={{
+                        margin: '16px 0 0',
+                        maxWidth: 560,
+                        fontSize: 16,
+                        lineHeight: 1.8,
+                        color: theme.textSecondary,
+                      }}
+                    >
+                      Start a fresh conversation, reopen earlier chats, or use a suggested prompt to move faster.
+                    </p>
+                  </div>
+
+                  <div
+                    style={{
+                      background: theme.surface,
+                      border: `1px solid ${theme.border}`,
+                      borderRadius: 28,
+                      padding: 18,
+                      backdropFilter: 'blur(18px)',
+                    }}
+                  >
+                    <form onSubmit={handleSubmitMessage}>
+                      <div style={{ position: 'relative' }}>
+                        <textarea
+                          value={chatInput}
+                          onChange={(event) => setChatInput(event.target.value)}
+                          disabled={isStreaming}
+                          placeholder="Ask anything..."
+                          rows={5}
+                          className="dashboard-input"
+                          style={{
+                            width: '100%',
+                            minHeight: 170,
+                            resize: 'vertical',
+                            borderRadius: 24,
+                            padding: '18px 64px 18px 18px',
+                            fontSize: 15,
+                          }}
+                        />
+                        <button
+                          type="submit"
+                          disabled={!chatInput.trim() || isStreaming}
+                          style={{
+                            position: 'absolute',
+                            right: 14,
+                            bottom: 14,
+                            width: 44,
+                            height: 44,
+                            borderRadius: 16,
+                            border: `1px solid ${chatInput.trim() && !isStreaming ? 'transparent' : theme.border}`,
+                            background: chatInput.trim() && !isStreaming ? theme.accent : 'transparent',
+                            color: chatInput.trim() && !isStreaming ? theme.bg : theme.textMuted,
+                            display: 'grid',
+                            placeItems: 'center',
+                            cursor: chatInput.trim() && !isStreaming ? 'pointer' : 'not-allowed',
+                          }}
+                        >
+                          <Send size={18} />
+                        </button>
+                      </div>
+
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: 10,
+                          marginTop: 16,
+                        }}
+                      >
+                        {suggestionPrompts.map((prompt) => (
+                          <button
+                            key={prompt}
+                            type="button"
+                            onClick={() => setChatInput(prompt)}
+                            style={{
+                              border: `1px solid ${theme.border}`,
+                              background: theme.surfaceSolid,
+                              color: theme.textSecondary,
+                              borderRadius: 999,
+                              padding: '10px 14px',
+                              fontSize: 13,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {prompt}
+                          </button>
+                        ))}
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div
+                  style={{
+                    flexShrink: 0,
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                    gap: 12,
+                  }}
+                >
+                  {[
+                    ['Active Chat', stripMarkdown(activeChat?.title || 'Current chat')],
+                    ['Messages', String(currentChatMessages.length)],
+                    ['Status', isStreaming ? 'Generating response' : 'Ready'],
+                  ].map(([label, value]) => (
+                    <div
+                      key={label}
+                      style={{
+                        background: theme.surface,
+                        border: `1px solid ${theme.border}`,
+                        borderRadius: 24,
+                        padding: '16px 18px',
+                        backdropFilter: 'blur(18px)',
+                      }}
+                    >
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: 11,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.22em',
+                          color: theme.textMuted,
+                        }}
+                      >
+                        {label}
+                      </p>
+                      <p
+                        style={{
+                          margin: '10px 0 0',
+                          fontSize: 16,
+                          fontWeight: 600,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {value}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <div
+                  style={{
+                    minHeight: 0,
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'hidden',
+                    background: theme.surface,
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: 28,
+                    backdropFilter: 'blur(18px)',
+                  }}
+                >
+                  <div
+                    className="messages"
+                    style={{
+                      minHeight: 0,
+                      flex: 1,
+                      overflowY: 'auto',
+                      padding: 18,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '100%',
+                        maxWidth: 920,
+                        margin: '0 auto',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 18,
+                      }}
+                    >
+                      {currentChatMessages.map((message, index) => {
+                        const isUser = message.role === 'user'
+                        return (
+                          <div
+                            key={index}
+                            className="dashboard-fade"
+                            style={{
+                              display: 'flex',
+                              justifyContent: isUser ? 'flex-end' : 'flex-start',
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: 'min(100%, 760px)',
+                                maxWidth: isUser ? '85%' : '100%',
+                                borderRadius: 24,
+                                padding: isUser ? '14px 16px' : '16px 18px',
+                                background: isUser ? theme.userBubble : theme.surfaceSolid,
+                                border: isUser ? 'none' : `1px solid ${theme.border}`,
+                              }}
+                            >
+                              <p
+                                style={{
+                                  margin: '0 0 10px',
+                                  fontSize: 11,
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.22em',
+                                  color: isUser ? theme.textSecondary : theme.accent,
+                                }}
+                              >
+                                {isUser ? 'You' : 'Inqora AI'}
+                              </p>
+
+                              {isUser ? (
+                                <p
+                                  style={{
+                                    margin: 0,
+                                    whiteSpace: 'pre-wrap',
+                                    fontSize: 15,
+                                    lineHeight: 1.7,
+                                  }}
+                                >
+                                  {message.content}
+                                </p>
+                              ) : (
+                                <div className="dashboard-markdown" style={{ fontSize: 15 }}>
+                                  <ReactMarkdown
+                                    components={{
+                                      p: ({ children }) => <p>{children}</p>,
+                                      ul: ({ children }) => <ul>{children}</ul>,
+                                      ol: ({ children }) => <ol>{children}</ol>,
+                                      code: ({ children }) => <code>{children}</code>,
+                                      pre: ({ children }) => <pre>{children}</pre>,
+                                    }}
+                                    remarkPlugins={[remarkGfm]}
+                                  >
+                                    {message.content}
+                                  </ReactMarkdown>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                      <div ref={messagesEndRef} />
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      flexShrink: 0,
+                      borderTop: `1px solid ${theme.border}`,
+                      padding: 16,
+                    }}
+                  >
+                    <form
+                      onSubmit={handleSubmitMessage}
+                      style={{
+                        width: '100%',
+                        maxWidth: 920,
+                        margin: '0 auto',
+                        position: 'relative',
+                      }}
+                    >
+                      <textarea
+                        value={chatInput}
+                        onChange={(event) => setChatInput(event.target.value)}
+                        disabled={isStreaming}
+                        placeholder="Type your message..."
+                        rows={1}
+                        className="dashboard-input"
+                        style={{
+                          width: '100%',
+                          minHeight: 64,
+                          maxHeight: 180,
+                          resize: 'vertical',
+                          borderRadius: 22,
+                          padding: '16px 58px 16px 16px',
+                          fontSize: 15,
+                        }}
+                      />
+                      <button
+                        type="submit"
+                        disabled={!chatInput.trim() || isStreaming}
+                        style={{
+                          position: 'absolute',
+                          right: 12,
+                          bottom: 12,
+                          width: 40,
+                          height: 40,
+                          borderRadius: 14,
+                          border: `1px solid ${chatInput.trim() && !isStreaming ? 'transparent' : theme.border}`,
+                          background: chatInput.trim() && !isStreaming ? theme.accent : 'transparent',
+                          color: chatInput.trim() && !isStreaming ? theme.bg : theme.textMuted,
+                          display: 'grid',
+                          placeItems: 'center',
+                          cursor: chatInput.trim() && !isStreaming ? 'pointer' : 'not-allowed',
+                        }}
+                      >
+                        <Send size={16} />
+                      </button>
+                    </form>
+                  </div>
                 </div>
               </>
             )}
           </div>
-        </div>
+        </main>
       </div>
     </>
   )
